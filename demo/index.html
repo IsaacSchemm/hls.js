@@ -219,6 +219,8 @@ $(document).ready(function() {
   var video = $('#video')[0];
   video.volume = 0.05;
 
+  var timedMetadataCache = {};
+
   loadStream(decodeURIComponent(getURLParam('src','http://www.streambox.fr/playlists/x36xhzz/x36xhzz.m3u8')));
 
 
@@ -265,6 +267,29 @@ $(document).ready(function() {
        });
        hls.on(Hls.Events.FRAG_PARSING_METADATA, function(event, data) {
          console.log("Id3 samples ", data.samples);
+         data.samples.forEach(function (sample) {
+           (function() {
+             // Convert array into string, assuming only ASCII characters (Unicode will probably not work)
+             var array = sample.data;
+             var str = "";
+             for (var i = 21; i < array.length; i++) {
+               if (array[i] == 0) break; // NUL terminator
+               str += String.fromCharCode(array[i]);
+             }
+             // Sequence number (?)
+             var sn = hls.fragmentLoader.frag.sn;
+             // Number of seconds to wait after this fragment starts playing before metadata is processed
+             var waittime = data.samples[j].pts - hls.fragmentLoader.frag.start;
+             // Populate timedMetadataCache for fragment with a function to run
+             if (!timedMetadataCache[sn]) timedMetadataCache[sn] = [];
+             timedMetadataCache[sn].push(function () {
+               setTimeout(function () {
+                 console.log("Process timed metadata here: " + str);
+                 $("#HlsStatus").text(str);
+               }, 1000 * waittime);
+             });
+           })();
+         });
        });
        hls.on(Hls.Events.LEVEL_SWITCH,function(event,data) {
           events.level.push({time : performance.now() - events.t0, id : data.level, bitrate : Math.round(hls.levels[data.level].bitrate/1000)});
@@ -363,6 +388,11 @@ $(document).ready(function() {
           stats.autoLevelCappingLast = hls.autoLevelCapping;
        });
        hls.on(Hls.Events.FRAG_CHANGED,function(event,data) {
+        // If functions exist in timedMetadataCache to run when this fragment starts playing, then run them now
+        if (timedMetadataCache[data.frag.sn]) {
+          timedMetadataCache[data.frag.sn].forEach(function (f) { f(); });
+          delete timedMetadataCache[data.frag.sn];
+        }
         var event = {time : performance.now() - events.t0, type : 'frag changed', name : data.frag.sn + ' @ ' + data.frag.level };
         events.video.push(event);
         refreshCanvas();
