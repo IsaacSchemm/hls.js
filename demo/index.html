@@ -284,7 +284,7 @@ $(document).ready(function() {
              // Sequence number (?)
              var sn = hls.fragmentLoader.frag.sn;
              // Number of seconds to wait after this fragment starts playing before metadata is processed
-             var waittime = data.samples[j].pts - hls.fragmentLoader.frag.start;
+             var waittime = sample.pts - hls.fragmentLoader.frag.start;
              // Populate timedMetadataCache for fragment with a function to run
              if (!timedMetadataCache[sn]) timedMetadataCache[sn] = [];
              timedMetadataCache[sn].push(function () {
